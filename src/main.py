@@ -1,6 +1,5 @@
 from math import ceil
 
-
 def process_input_file(filepath: str):
     stats = {}
 
@@ -9,10 +8,11 @@ def process_input_file(filepath: str):
             city, idli_str = row.strip().split(";")
             idli = float(idli_str)
             if city in stats:
-                stats[city][0] = min(stats[city][0], idli)
-                stats[city][1] = max(stats[city][1], idli)
-                stats[city][2] += idli
-                stats[city][3] += 1
+                stats_city = stats[city]
+                stats_city[0] = min(stats[city][0], idli)
+                stats_city[1] = max(stats[city][1], idli)
+                stats_city[2] += idli
+                stats_city[3] += 1
             else:
                 stats[city] = [idli, idli, idli, 1]
                 
