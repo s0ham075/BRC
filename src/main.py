@@ -1,7 +1,7 @@
 import mmap
 import multiprocessing
 import os
-from math import ceil,floor
+from math import ceil
 
 CPU_COUNT = os.cpu_count()
 MMAP_PAGE_SIZE = os.sysconf("SC_PAGE_SIZE")
@@ -102,8 +102,7 @@ def read_file_in_chunks(input_file_name,output_file_name):
 
     with open(output_file_name, "w") as f:
         for city, data in sorted(final.items()):
-            x = ceil((0.1*data[1] / data[0]) * 10) / 10
-            f.write(f"{city.decode()}={0.1*data[2]:.1f}/{x}/{0.1*data[3]:.1f}\n") 
+            f.write(f"{city.decode()}={0.1*data[2]:.1f}/{ceil((0.1*data[1] / data[0]) * 10) / 10}/{0.1*data[3]:.1f}\n") 
 
            
 def main(input_file_name = "testcase.txt", output_file_name = "output.txt"):
