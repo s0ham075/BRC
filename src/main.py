@@ -107,12 +107,26 @@ def read_file_in_chunks(input_file_name,output_file_name):
         x = ceil((data[1] / data[0]) * 10) / 10
         lines.append(f"{city.decode()}={data[2]:.1f}/{x}/{data[3]:.1f}\n") 
     
-
-    with open(output_file_name, "w") as f:
-       f.writelines(lines)
+    data = "".join(lines).encode("utf-8")
+    # with open(output_file_name, "w") as f:
+    #    f.writelines(lines)
         # f.write("h")
         # with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_WRITE) as mapped_file:
         #     mapped_file.write(data)
+    with open(output_file_name, "wb+") as f:
+    # Write a dummy byte so that the file isn’t empty
+        f.write(b"h")
+    # Resize the file to the required size (dummy + data length)
+        f.truncate(1 + len(data))
+    
+    # Create an mmap with the new file size
+        with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_WRITE) as mapped_file:
+        # Overwrite from the beginning; this replaces the dummy
+            mapped_file.seek(0)
+            mapped_file.write(data)
+    
+    # Truncate the file to the actual data length (removing any extra dummy if present)
+        f.truncate(len(data))
 
            
 def main(input_file_name = "testcase.txt", output_file_name = "output.txt"):
