@@ -5,7 +5,7 @@ from math import ceil
 
 CPU_COUNT = os.cpu_count()
 MMAP_PAGE_SIZE = os.sysconf("SC_PAGE_SIZE")
-CHUNK_SIZE = 4*256 * 1024  # 256 KB
+CHUNK_SIZE = 2*256 * 1024  # 256 KB
 
 # def to_int(x: bytes) -> int:
 #     if x[0] == 45:  # ASCII for "-"
