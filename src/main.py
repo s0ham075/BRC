@@ -2,7 +2,7 @@ from math import ceil
 import mmap
 import multiprocessing
 
-CHUNK_SIZE = 256 * 1024  # 256 KB
+CHUNK_SIZE = 2*256 * 1024  # 256 KB
 
 def process_chunk(filename, start_offset, end_offset):
     cities = {}
