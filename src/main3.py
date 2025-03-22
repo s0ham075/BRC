@@ -4,7 +4,7 @@ import multiprocessing
 import threading
 import queue
 
-CHUNK_SIZE = 64 * 1024  # 256 KB
+CHUNK_SIZE = 2*256 * 1024  # 256 KB
 
 def reader_thread(filename, start_offset, end_offset, data_queue):
     """Thread function to read a chunk of data from file and put it in queue"""
