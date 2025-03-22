@@ -153,7 +153,8 @@ def main(input_file_name="testcase.txt", output_file_name="output.txt"):
         )
     
     data_bytes = b"".join(lines)
-    write_large_data_to_file(output_file_name, data_bytes, CHUNK_SIZE)
+    with open(output_file_name, "wb") as f:
+        f.write(data_bytes)
 
 if __name__ == "__main__":
     main()

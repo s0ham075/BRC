@@ -1,79 +1,116 @@
+from math import ceil
 import mmap
 import multiprocessing
-import os
-from math import ceil
+import threading
+import queue
 
-CPU_COUNT = os.cpu_count()
-MMAP_PAGE_SIZE = os.sysconf("SC_PAGE_SIZE")
-CHUNK_SIZE = 2*256 * 1024  # 256 KB
+CHUNK_SIZE = 256 * 1024  # 256 KB
 
-# def to_int(x: bytes) -> int:
-#     if x[0] == 45:  # ASCII for "-"
-#         sign = -1
-#         idx = 1
-#     else:
-#         sign = 1
-#         idx = 0
-#     # Check the position of the decimal point
-#     if x[idx + 1] == 46:  # ASCII for "."
-#         # -#.# or #.#
-#         # 528 == ord("0") * 11
-#         result = sign * ((x[idx] * 10 + x[idx + 2]) - 528)
-#     else:
-#         # -##.# or ##.#
-#         # 5328 == ord("0") * 111
-#         result = sign * ((x[idx] * 100 + x[idx + 1] * 10 + x[idx + 3]) - 5328)
-#
-#     return result
+def reader_thread(filename, start_offset, end_offset, data_queue):
+    """Thread function to read a chunk of data from file and put it in queue"""
+    with open(filename, "rb") as f:
+        mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
+        size = len(mm)
+        
+        # Find the start of a complete line
+        if start_offset != 0:
+            while start_offset < size and mm[start_offset] != ord('\n'):
+                start_offset += 1
+            start_offset += 1  
+        
+        # Find the end of a complete line
+        end = end_offset
+        while end < size and mm[end] != ord('\n'):
+            end += 1
+        if end < size:
+            end += 1 
+        
+        # Read the data
+        data = mm[start_offset:end]
+        mm.close()
+    
+    # Put the data in the queue for the processor thread
+    data_queue.put(data)
 
-def reduce(results):
-    final = {}
+def processor_thread(data_queue, result_queue):
+    """Thread function to process data from queue and put results in result queue"""
+    cities = {}
+    
+    # Get data from queue
+    data = data_queue.get()
+    
+    # Process the data
+    lines = data.split(b'\n')
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        
+        semicolon_pos = line.find(b';')
+        if semicolon_pos == -1:
+            continue
+        
+        city = line[:semicolon_pos]
+        idli_str = line[semicolon_pos+1:]
+        try:
+            idli = float(idli_str)
+        except ValueError:
+            continue
+        
+        if city in cities:
+            entry = cities[city]
+            entry[0] = min(entry[0], idli)
+            entry[1] = max(entry[1], idli)
+            entry[2] += idli
+            entry[3] += 1
+        else:
+            cities[city] = [idli, idli, idli, 1]
+    
+    # Put results in the result queue
+    result_queue.put(cities)
+
+def process_chunk_with_threads(filename, start_offset, end_offset):
+    """Process a chunk of the file using two threads"""
+    # Create queues for communication between threads
+    data_queue = queue.Queue()
+    result_queue = queue.Queue()
+    
+    # Create and start the reader thread
+    reader = threading.Thread(
+        target=reader_thread, 
+        args=(filename, start_offset, end_offset, data_queue)
+    )
+    
+    # Create and start the processor thread
+    processor = threading.Thread(
+        target=processor_thread,
+        args=(data_queue, result_queue)
+    )
+    
+    # Start both threads
+    reader.start()
+    processor.start()
+    
+    # Wait for both threads to complete
+    reader.join()
+    processor.join()
+    
+    # Get and return the results
+    return result_queue.get()
+
+def merge_results(results):
+    merged = {}
     for result in results:
-        for city, item in result.items():
-            if city in final:
-                city_result = final[city]
-                city_result[0] += item[0]
-                city_result[1] += item[1]
-                city_result[2] = min(city_result[2], item[2])
-                city_result[3] = max(city_result[3], item[3])
+        for city, stats in result.items():
+            if city in merged:
+                current = merged[city]
+                current[0] = min(current[0], stats[0])
+                current[1] = max(current[1], stats[1])
+                current[2] += stats[2]
+                current[3] += stats[3]
             else:
-                final[city] = item
-    return final
-
-def process_line(line, result):
-    if not line or line == b'\n':
-        return
-    idx = line.find(b";")
-    city = line[:idx]
-    idli_int = float(line[idx + 1 : -1])
-    if city in result:
-        item = result[city]
-        item[0] += 1
-        item[1] += idli_int
-        item[2] = min(item[2], idli_int)
-        item[3] = max(item[3], idli_int)
-    else:
-        result[city] = [1, idli_int, idli_int, idli_int]
-
-def align_offset(offset, page_size):
-    return (offset // page_size) * page_size
-
-def process_chunk(input_file_name, start_byte, end_byte):
-    offset = align_offset(start_byte, MMAP_PAGE_SIZE)
-    result = {}
-
-    with open(input_file_name, "rb") as file:
-        length = end_byte - offset
-
-        with mmap.mmap(
-            file.fileno(), length, access=mmap.ACCESS_READ, offset=offset
-        ) as mmapped_file:
-            mmapped_file.seek(start_byte - offset)
-            line = mmapped_file.readline()
-            while line:  # Continue until we get an empty line
-                process_line(line, result)
-                line = mmapped_file.readline()
-    return result
+                merged[city] = list(stats)
+    return merged
 
 def write_large_data_to_file(filename, data, chunk_size=CHUNK_SIZE):
     """Write the given bytes object to a file in chunks of chunk_size."""
@@ -81,50 +118,43 @@ def write_large_data_to_file(filename, data, chunk_size=CHUNK_SIZE):
         for i in range(0, len(data), chunk_size):
             file.write(data[i : i + chunk_size])
 
-def read_file_in_chunks(input_file_name, output_file_name):
-    file_size_bytes = os.path.getsize(input_file_name)
-    base_chunk_size = file_size_bytes // CPU_COUNT
-    chunks = []
-
-    with open(input_file_name, "r+b") as file:
-        with mmap.mmap(file.fileno(), length=0, access=mmap.ACCESS_READ) as mmapped_file:
-            start_byte = 0
-            for _ in range(CPU_COUNT):
-                end_byte = min(start_byte + base_chunk_size, file_size_bytes)
-                end_byte = mmapped_file.find(b"\n", end_byte)
-                end_byte = end_byte + 1 if end_byte != -1 else file_size_bytes
-                chunks.append((input_file_name, start_byte, end_byte))
-                start_byte = end_byte
-
-    with multiprocessing.Pool(processes=CPU_COUNT) as p:
-        results = p.starmap(process_chunk, chunks)
-
-    final = reduce(results)
-
-    sorted_cities = sorted(final.keys(), key=lambda x: x.decode())
-    # lines = []
-    # for city in sorted_cities:
-    #     data_vals = final[city]
-    #     x = ceil((data_vals[1] / data_vals[0]) * 10) / 10
-    #     lines.append(f"{city.decode()}={data_vals[2]:.1f}/{x}/{data_vals[3]:.1f}\n")
-    
-    # # Combine lines and encode into a bytes object.
-    # data = "".join(lines).encode("utf-8")
-    lines_list = []
-    for city in sorted_cities:
-        data_vals = final[city]
-        x = ceil((data_vals[1] / data_vals[0]) * 10) / 10
-        lines_list.append(
-            f"{city.decode()}={data_vals[2]:.1f}/{x}/{data_vals[3]:.1f}\n".encode("utf-8")
-        )
-
-    data_bytes = b"".join(lines_list)
-
-    # Write the output file in 256KB chunks.
-    write_large_data_to_file(output_file_name, data_bytes, CHUNK_SIZE)
-
 def main(input_file_name="testcase.txt", output_file_name="output.txt"):
-    read_file_in_chunks(input_file_name, output_file_name)
+    # Get file size
+    with open(input_file_name, "rb") as f:
+        mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
+        file_size = len(mm)
+        mm.close()
     
+    # Divide the file into chunks for multiprocessing
+    num_procs = multiprocessing.cpu_count()
+    chunk_size = file_size // num_procs
+    chunks = []
+    for i in range(num_procs):
+        start = i * chunk_size
+        end = start + chunk_size if i < num_procs - 1 else file_size
+        chunks.append((start, end))
+    
+    # Process each chunk in a separate process, using threads within each process
+    with multiprocessing.Pool(num_procs) as pool:
+        tasks = [(input_file_name, start, end) for start, end in chunks]
+        results = pool.starmap(process_chunk_with_threads, tasks)
+    
+    # Merge the results from all processes
+    merged = merge_results(results)
+    
+    # Format and write results
+    sorted_cities = sorted(merged.keys(), key=lambda x: x.decode())
+    lines = []
+    for city in sorted_cities:
+        data_vals = merged[city]
+        x = ceil((data_vals[2] / data_vals[3]) * 10) / 10
+        lines.append(
+            f"{city.decode()}={data_vals[0]:.1f}/{x}/{data_vals[1]:.1f}\n".encode("utf-8")
+        )
+    
+    data_bytes = b"".join(lines)
+    with open(output_file_name, "wb") as f:
+        f.write(data_bytes)
+
 if __name__ == "__main__":
     main()
