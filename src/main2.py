@@ -6,6 +6,26 @@ from math import ceil
 CPU_COUNT = os.cpu_count()
 MMAP_PAGE_SIZE = os.sysconf("SC_PAGE_SIZE")
 
+def to_int(x: bytes) -> int:
+    # Parse sign
+    if x[0] == 45:  # ASCII for "-"
+        sign = -1
+        idx = 1
+    else:
+        sign = 1
+        idx = 0
+    # Check the position of the decimal point
+    if x[idx + 1] == 46:  # ASCII for "."
+        # -#.# or #.#
+        # 528 == ord("0") * 11
+        result = sign * ((x[idx] * 10 + x[idx + 2]) - 528)
+    else:
+        # -##.# or ##.#
+        # 5328 == ord("0") * 111
+        result = sign * ((x[idx] * 100 + x[idx + 1] * 10 + x[idx + 3]) - 5328)
+
+    return result
+
 def reduce(results):
     final = {}
     for result in results:
@@ -25,7 +45,7 @@ def process_line(line, result):
         return
     idx = line.find(b";")
     city = line[:idx]
-    idli_int = int(line[idx + 1 : -3] + line[-2:-1])
+    idli_int = to_int(line[idx + 1 : -3] + line[-2:-1])
 
     if city in result:
         item = result[city]

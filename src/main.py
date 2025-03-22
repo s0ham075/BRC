@@ -1,10 +1,29 @@
 import mmap
 import multiprocessing
 import os
-from math import ceil
+from math import ceil,floor
 
 CPU_COUNT = os.cpu_count()
 MMAP_PAGE_SIZE = os.sysconf("SC_PAGE_SIZE")
+
+def to_int(x: bytes) -> int:
+    if x[0] == 45:  # ASCII for "-"
+        sign = -1
+        idx = 1
+    else:
+        sign = 1
+        idx = 0
+    # Check the position of the decimal point
+    if x[idx + 1] == 46:  # ASCII for "."
+        # -#.# or #.#
+        # 528 == ord("0") * 11
+        result = sign * ((x[idx] * 10 + x[idx + 2]) - 528)
+    else:
+        # -##.# or ##.#
+        # 5328 == ord("0") * 111
+        result = sign * ((x[idx] * 100 + x[idx + 1] * 10 + x[idx + 3]) - 5328)
+
+    return result
 
 def reduce(results):
     final = {}
@@ -25,8 +44,7 @@ def process_line(line, result):
         return
     idx = line.find(b";")
     city = line[:idx]
-    idli_int = int(line[idx + 1 : -3] + line[-2:-1])
-
+    idli_int = to_int(line[idx + 1 : -1])
     if city in result:
         item = result[city]
         item[0] += 1
@@ -84,9 +102,10 @@ def read_file_in_chunks(input_file_name,output_file_name):
 
     with open(output_file_name, "w") as f:
         for city, data in sorted(final.items()):
-            f.write(f"{city.decode()}={0.1*data[2]}/{ceil((0.1*data[1] / data[0])*10)/10}/{0.1*data[3]}\n")
+            x = ceil((0.1*data[1] / data[0]) * 10) / 10
+            f.write(f"{city.decode()}={0.1*data[2]:.1f}/{x}/{0.1*data[3]:.1f}\n") 
 
-
+           
 def main(input_file_name = "testcase.txt", output_file_name = "output.txt"):
     read_file_in_chunks(input_file_name,output_file_name)
     
