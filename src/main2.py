@@ -101,13 +101,13 @@ def read_file_in_chunks(input_file_name,output_file_name):
     final = reduce(results)
 
     sorted_cities = sorted(final.keys(), key=lambda x: x.decode())
-    lines = []
+    lines = ""
     for city in sorted_cities:
         data = final[city]
         x = ceil((data[1] / data[0]) * 10) / 10
-        lines.append(f"{city.decode()}={data[2]:.1f}/{x}/{data[3]:.1f}\n") 
+        lines.concat((f"{city.decode()}={data[2]:.1f}/{x}/{data[3]:.1f}\n").encode("utf-8")) 
     
-    data = "".join(lines).encode("utf-8")
+    # data = "".join(lines).encode("utf-8")
     # with open(output_file_name, "w") as f:
     #    f.writelines(lines)
         # f.write("h")

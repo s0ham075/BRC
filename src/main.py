@@ -102,17 +102,26 @@ def read_file_in_chunks(input_file_name, output_file_name):
     final = reduce(results)
 
     sorted_cities = sorted(final.keys(), key=lambda x: x.decode())
-    lines = []
+    # lines = []
+    # for city in sorted_cities:
+    #     data_vals = final[city]
+    #     x = ceil((data_vals[1] / data_vals[0]) * 10) / 10
+    #     lines.append(f"{city.decode()}={data_vals[2]:.1f}/{x}/{data_vals[3]:.1f}\n")
+    
+    # # Combine lines and encode into a bytes object.
+    # data = "".join(lines).encode("utf-8")
+    lines_list = []
     for city in sorted_cities:
         data_vals = final[city]
         x = ceil((data_vals[1] / data_vals[0]) * 10) / 10
-        lines.append(f"{city.decode()}={data_vals[2]:.1f}/{x}/{data_vals[3]:.1f}\n")
-    
-    # Combine lines and encode into a bytes object.
-    data = "".join(lines).encode("utf-8")
-    
+        lines_list.append(
+            f"{city.decode()}={data_vals[2]:.1f}/{x}/{data_vals[3]:.1f}\n".encode("utf-8")
+        )
+
+    data_bytes = b"".join(lines_list)
+
     # Write the output file in 256KB chunks.
-    write_large_data_to_file(output_file_name, data, CHUNK_SIZE)
+    write_large_data_to_file(output_file_name, data_bytes, CHUNK_SIZE)
 
 def main(input_file_name="testcase.txt", output_file_name="output.txt"):
     read_file_in_chunks(input_file_name, output_file_name)
