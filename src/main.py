@@ -44,7 +44,7 @@ def process_line(line, result):
         return
     idx = line.find(b";")
     city = line[:idx]
-    idli_int = int(line[idx + 1 : -3] + line[-2:-1])
+    idli_int = float(line[idx + 1 : -1])
     if city in result:
         item = result[city]
         item[0] += 1
@@ -104,12 +104,15 @@ def read_file_in_chunks(input_file_name,output_file_name):
     lines = []
     for city in sorted_cities:
         data = final[city]
-        x = ceil((0.1*data[1] / data[0]) * 10) / 10
-        lines.append(f"{city.decode()}={0.1*data[2]:.1f}/{x}/{0.1*data[3]:.1f}\n") 
+        x = ceil((data[1] / data[0]) * 10) / 10
+        lines.append(f"{city.decode()}={data[2]:.1f}/{x}/{data[3]:.1f}\n") 
     
 
     with open(output_file_name, "w") as f:
        f.writelines(lines)
+        # f.write("h")
+        # with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_WRITE) as mapped_file:
+        #     mapped_file.write(data)
 
            
 def main(input_file_name = "testcase.txt", output_file_name = "output.txt"):
