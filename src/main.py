@@ -102,7 +102,8 @@ def read_file_in_chunks(input_file_name,output_file_name):
 
     with open(output_file_name, "w") as f:
         for city, data in sorted(final.items()):
-            f.write(f"{city.decode()}={0.1*data[2]:.1f}/{ceil((0.1*data[1] / data[0]) * 10) / 10}/{0.1*data[3]:.1f}\n") 
+            x = ceil((0.1*data[1] / data[0]) * 10) / 10
+            f.write(f"{city.decode()}={0.1*data[2]:.1f}/{x}/{0.1*data[3]:.1f}\n") 
 
            
 def main(input_file_name = "testcase.txt", output_file_name = "output.txt"):
