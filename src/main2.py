@@ -5,7 +5,6 @@ from math import ceil
 
 CPU_COUNT = os.cpu_count()
 MMAP_PAGE_SIZE = os.sysconf("SC_PAGE_SIZE")
-CHUNK_SIZE = 256 * 1024  # 256 KB
 
 # def to_int(x: bytes) -> int:
 #     if x[0] == 45:  # ASCII for "-"
@@ -23,7 +22,7 @@ CHUNK_SIZE = 256 * 1024  # 256 KB
 #         # -##.# or ##.#
 #         # 5328 == ord("0") * 111
 #         result = sign * ((x[idx] * 100 + x[idx + 1] * 10 + x[idx + 3]) - 5328)
-#
+
 #     return result
 
 def reduce(results):
@@ -53,10 +52,11 @@ def process_line(line, result):
         item[2] = min(item[2], idli_int)
         item[3] = max(item[3], idli_int)
     else:
-        result[city] = [1, idli_int, idli_int, idli_int]
+        result[city] = [1, idli_int, idli_int,idli_int]
 
 def align_offset(offset, page_size):
     return (offset // page_size) * page_size
+
 
 def process_chunk(input_file_name, start_byte, end_byte):
     offset = align_offset(start_byte, MMAP_PAGE_SIZE)
@@ -69,25 +69,24 @@ def process_chunk(input_file_name, start_byte, end_byte):
             file.fileno(), length, access=mmap.ACCESS_READ, offset=offset
         ) as mmapped_file:
             mmapped_file.seek(start_byte - offset)
+            # for line in iter(mmapped_file.readline, b"\n"):
+            #     process_line(line, result)
             line = mmapped_file.readline()
             while line:  # Continue until we get an empty line
                 process_line(line, result)
                 line = mmapped_file.readline()
     return result
 
-def write_large_data_to_file(filename, data, chunk_size=CHUNK_SIZE):
-    """Write the given bytes object to a file in chunks of chunk_size."""
-    with open(filename, "wb") as file:
-        for i in range(0, len(data), chunk_size):
-            file.write(data[i : i + chunk_size])
 
-def read_file_in_chunks(input_file_name, output_file_name):
+def read_file_in_chunks(input_file_name,output_file_name):
     file_size_bytes = os.path.getsize(input_file_name)
     base_chunk_size = file_size_bytes // CPU_COUNT
     chunks = []
 
     with open(input_file_name, "r+b") as file:
-        with mmap.mmap(file.fileno(), length=0, access=mmap.ACCESS_READ) as mmapped_file:
+        with mmap.mmap(
+            file.fileno(), length=0, access=mmap.ACCESS_READ
+        ) as mmapped_file:
             start_byte = 0
             for _ in range(CPU_COUNT):
                 end_byte = min(start_byte + base_chunk_size, file_size_bytes)
@@ -104,18 +103,34 @@ def read_file_in_chunks(input_file_name, output_file_name):
     sorted_cities = sorted(final.keys(), key=lambda x: x.decode())
     lines = []
     for city in sorted_cities:
-        data_vals = final[city]
-        x = ceil((data_vals[1] / data_vals[0]) * 10) / 10
-        lines.append(f"{city.decode()}={data_vals[2]:.1f}/{x}/{data_vals[3]:.1f}\n")
+        data = final[city]
+        x = ceil((data[1] / data[0]) * 10) / 10
+        lines.append(f"{city.decode()}={data[2]:.1f}/{x}/{data[3]:.1f}\n") 
     
-    # Combine lines and encode into a bytes object.
     data = "".join(lines).encode("utf-8")
+    # with open(output_file_name, "w") as f:
+    #    f.writelines(lines)
+        # f.write("h")
+        # with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_WRITE) as mapped_file:
+        #     mapped_file.write(data)
+    with open(output_file_name, "wb+") as f:
+    # Write a dummy byte so that the file isn’t empty
+        f.write(b"h")
+    # Resize the file to the required size (dummy + data length)
+        f.truncate(1 + len(data))
     
-    # Write the output file in 256KB chunks.
-    write_large_data_to_file(output_file_name, data, CHUNK_SIZE)
+    # Create an mmap with the new file size
+        with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_WRITE) as mapped_file:
+        # Overwrite from the beginning; this replaces the dummy
+            mapped_file.seek(0)
+            mapped_file.write(data)
+    
+    # Truncate the file to the actual data length (removing any extra dummy if present)
+        f.truncate(len(data))
 
-def main(input_file_name="testcase.txt", output_file_name="output.txt"):
-    read_file_in_chunks(input_file_name, output_file_name)
+           
+def main(input_file_name = "testcase.txt", output_file_name = "output.txt"):
+    read_file_in_chunks(input_file_name,output_file_name)
     
 if __name__ == "__main__":
     main()
